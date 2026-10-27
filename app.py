@@ -16,10 +16,14 @@ st.markdown("""
 st.title("🤖 MATRIX V6 • NUVEM ATIVA")
 st.write("Painel Inteligente com Varredura de Ativos e Gestão de Risco")
 
+# --- LEITURA AUTOMÁTICA DA CHAVE (SECRETS OU BARRA LATERAL) ---
+if "OPENAI_API_KEY" in st.secrets:
+    api_key_input = st.secrets["OPENAI_API_KEY"]
+else:
+    api_key_input = st.sidebar.text_input("Sua Chave OpenAI (API Key)", type="password")
+
 # --- CONFIGURAÇÕES NA BARRA LATERAL ---
 st.sidebar.header("⚙️ Configurações & Risco")
-api_key_input = st.sidebar.text_input("Sua Chave OpenAI (API Key)", type="password")
-
 banca_inicial = st.sidebar.number_input("Banca Inicial (R$)", value=500.0, step=10.0)
 stake = st.sidebar.number_input("Valor da Entrada / Stake (R$)", value=5.0, step=1.0)
 payout = st.sidebar.number_input("Payout do Ativo (%)", value=82.0, step=1.0)
@@ -84,7 +88,7 @@ st.write("O Coordenador fará uma varredura cruzando o cenário atual com o hist
 
 if st.button("🚀 EXECUTAR VARREDURA DOS TOP 5 ATIVOS"):
     if not api_key_input:
-        st.error("⚠️ Insira sua Chave da OpenAI na barra lateral esquerda.")
+        st.error("⚠️ Insira sua Chave da OpenAI (nos Secrets do Streamlit ou na barra lateral).")
     else:
         with st.spinner("🤖 Os agentes estão escaneando o mercado e cruzando com o Loss Loop..."):
             try:
