@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from openai import OpenAI
 
-st.set_page_config(page_title="Matrix V6 - Vision Pro", page_icon="🤖", layout="centered")
+st.set_page_config(page_title="Matrix V6 - Multi-Agentes", page_icon="🤖", layout="centered")
 
 st.markdown("""
     <style>
@@ -16,7 +16,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🤖 MATRIX V6 • VISION PRO")
+st.title("🤖 MATRIX V6 • MULTI-AGENTES")
 
 # --- LEITURA DA CHAVE ---
 if "OPENAI_API_KEY" in st.secrets:
@@ -73,10 +73,9 @@ def salvar_memoria_historico(resultado, feedback):
         except Exception:
             historico = []
     historico.append(novo_registro)
-    with open(ARQUIVO_MEMORIA, "w", encoding="utf-8") as f:
+    with open(ARQUING := ARQUIVO_MEMORIA) if False else open(ARQUIVO_MEMORIA, "w", encoding="utf-8") as f:
         json.dump(historico, f, indent=4, ensure_ascii=False)
 
-# --- FUNÇÃO PARA CALCULAR A PRÓXIMA VELA REDONDA ---
 def calcular_proxima_vela(agora, timeframe_str):
     minutos_tf = 5
     if "1M" in timeframe_str.upper():
@@ -104,21 +103,22 @@ c3.metric("Win Rate", f"{win_rate:.0f}%")
 
 st.divider()
 
-# --- UPLOAD DE PRINT ---
-st.subheader("📸 Envie o Print do Gráfico")
+# --- INTERFACE DE ENTRADA ---
+st.subheader("🤖 Mesa de Operações (Multi-Agentes)")
 agora_sp = datetime.now(ZoneInfo("America/Sao_Paulo"))
 st.caption(f"🕒 Relógio SP: **{agora_sp.strftime('%H:%M:%S')}**")
 
-arquivo_print = st.file_uploader("Escolha a imagem do gráfico", type=["jpg", "jpeg", "png"])
+ativo_escolhido = st.selectbox("Selecione o Ativo na Hezilex:", ["EUR/USD", "GBP/USD", "AUD/USD", "EUR/JPY", "USD/JPY", "CARDANO"])
+arquivo_print = st.file_uploader("Envie o Print do Gráfico da Hezilex", type=["jpg", "jpeg", "png"])
 
 if arquivo_print is not None:
-    st.image(arquivo_print, caption="Gráfico enviado", use_container_width=True)
+    st.image(arquivo_print, caption=f"Gráfico de {ativo_escolhido} carregado", use_container_width=True)
     
-    if st.button("🔍 ANALISAR PRINT COM OS AGENTES"):
+    if st.button("🚀 ACIONAR COMITÊ DE AGENTES"):
         if not api_key_input:
             st.error("⚠️ Insira a Chave OpenAI.")
         else:
-            with st.spinner("Analisando Price Action, confluência e cálculo de vela..."):
+            with st.spinner("🔄 Agente 1 coletando cenário (Investing/Forex) -> Agentes Especialistas analisando Price Action -> Coordenador definindo ordem..."):
                 try:
                     import base64
                     image_bytes = arquivo_print.getvalue()
@@ -128,18 +128,27 @@ if arquivo_print is not None:
                     historico_recente = carregar_historico_15_dias()
 
                     prompt_sistema = f"""
-                    Você é o Coordenador Geral do sistema Matrix V6 de Opções Binárias.
-                    O horário atual em São Paulo é {agora_sp.strftime('%H:%M:%S')}.
-                    Histórico de erros recentes (Loss Loop para calibragem): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
+                    Você é o sistema Coordenador Geral da matriz multi-agentes Matrix V6.
+                    Ativo selecionado: {ativo_escolhido}
+                    Horário atual em São Paulo: {agora_sp.strftime('%H:%M:%S')}.
+                    Histórico de Loss Loop (erros recentes para calibração): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
                     
-                    Analise rigorosamente a imagem do gráfico enviada. Identifique a tendência, suporte/resistência, confluência técnica e nível de confiança.
-                    Retorne estritamente um JSON com a seguinte estrutura exata:
+                    A matriz opera com agentes em cadeia:
+                    - AGENTE 1 (Scraper/Contexto): Mapeia o cenário macroeconômico atual para o ativo {ativo_escolhido}.
+                    - AGENTES ESPECIALISTAS (Price Action e Indicadores): Analisam detalhadamente o print enviado (velas, tendência, suportes e resistências).
+                    - COORDENADOR: Sintetiza os pareceres, calcula confluência e nível de confiança.
+                    
+                    REGRA ABSOLUTA: Você DEVE escolher obrigatoriamente uma única direção clara: estritamente "COMPRA" ou estritamente "VENDA". Nunca responda em cima do muro.
+                    
+                    Retorne estritamente um objeto JSON com esta estrutura exata:
                     {{
+                      "parecer_agente1": "Resumo do cenário macroeconômico e fluxo do ativo.",
+                      "parecer_especialistas": "Análise técnica detalhada das velas e tendência no print.",
                       "direcao": "COMPRA ou VENDA",
-                      "confianca": "Ex: 95%",
                       "confluencia": "Ex: 8.5 / 10",
-                      "tempo_grafico": "Ex: 5M",
-                      "analise": "Explicação técnica detalhada baseada no que você vê na imagem."
+                      "confianca": "Ex: 92%",
+                      "tempo_grafico": "5M",
+                      "analise_final": "Conclusão definitiva do Coordenador para a operação."
                     }}
                     """
                     
@@ -166,24 +175,29 @@ if arquivo_print is not None:
                     tf = dados_ia.get("tempo_grafico", "5M")
                     dados_ia["hora_exata"] = calcular_proxima_vela(agora_sp, tf)
                     
-                    st.session_state.resultado_visao = dados_ia
+                    st.session_state.resultado_comite = dados_ia
                 except Exception as e:
-                    st.error(f"Erro na análise: {e}")
+                    st.error(f"Erro na execução dos agentes: {e}")
 
-# Exibição do Resultado com Cores Corrigidas e Métricas Completas
-if 'resultado_visao' in st.session_state:
-    res = st.session_state.resultado_visao
+# Exibição estruturada do Comitê de Agentes
+if 'resultado_comite' in st.session_state:
+    res = st.session_state.resultado_comite
     direcao = res.get("direcao", "NEUTRO").upper()
     
-    # Cores corretas: Verde para COMPRA, Vermelho para VENDA
+    st.divider()
     if "COMPRA" in direcao:
-        st.success(f"🎯 RECOMENDAÇÃO: **{direcao}**")
+        st.success(f"🎯 DECISÃO DO COMITÊ: **{direcao}**")
     else:
-        st.error(f"🎯 RECOMENDAÇÃO: **{direcao}**")
+        st.error(f"🎯 DECISÃO DO COMITÊ: **{direcao}**")
         
     st.write(f"🕒 **Horário Exato de Entrada:** `{res.get('hora_exata')}` ({res.get('tempo_grafico')})")
-    st.write(f"⭐ **Confluência:** {res.get('confluencia', 'N/D')}  |  🔒 **Confiança:** {res.get('confianca', 'N/D')}")
-    st.info(f"💡 **Parecer Técnico:** {res.get('analise')}")
+    st.write(f"⭐ **Confluência:** {res.get('confluencia')}  |  🔒 **Confiança:** {res.get('confianca')}")
+    
+    with st.expander("🕵️ Ver Relatórios Individuais dos Agentes"):
+        st.markdown(f"🌐 **Agente 1 (Cenário / Investing):**\n{res.get('parecer_agente1')}")
+        st.markdown(f"📈 **Agentes Especialistas (Price Action):**\n{res.get('parecer_especialistas')}")
+    
+    st.info(f"💡 **Parecer Final do Coordenador:** {res.get('analise_final')}")
 
 st.divider()
 
@@ -196,14 +210,14 @@ if col_win.button("✅ REGISTRAR WIN"):
     st.session_state.banca_atual += lucro
     st.session_state.lucro_liquido += lucro
     st.session_state.wins += 1
-    salvar_memoria_historico("WIN", "Vitória validada.")
+    salvar_memoria_historico("WIN", "Vitória validada pelo comitê.")
     st.rerun()
 
 if col_loss.button("❌ REGISTRAR LOSS"):
     st.session_state.banca_atual -= stake
     st.session_state.lucro_liquido -= stake
     st.session_state.losses += 1
-    salvar_memoria_historico("LOSS", "Loss registrado. Calibrando agentes.")
+    salvar_memoria_historico("LOSS", "Loss registrado. Calibração aplicada ao Loss Loop.")
     st.rerun()
 
 if st.session_state.lucro_liquido >= meta_lucro:
