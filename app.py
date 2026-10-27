@@ -118,7 +118,7 @@ if arquivo_print is not None:
         if not api_key_input:
             st.error("⚠️ Insira a Chave OpenAI.")
         else:
-            with st.spinner("Analisando Price Action e calculando horário da vela..."):
+            with st.spinner("Analisando Price Action, confluência e cálculo de vela..."):
                 try:
                     import base64
                     image_bytes = arquivo_print.getvalue()
@@ -132,11 +132,12 @@ if arquivo_print is not None:
                     O horário atual em São Paulo é {agora_sp.strftime('%H:%M:%S')}.
                     Histórico de erros recentes (Loss Loop para calibragem): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
                     
-                    Analise rigorosamente a imagem do gráfico enviada. Identifique a tendência atual, suporte/resistência e velas recentes.
-                    Retorne estritamente um JSON com a seguinte estrutura:
+                    Analise rigorosamente a imagem do gráfico enviada. Identifique a tendência, suporte/resistência, confluência técnica e nível de confiança.
+                    Retorne estritamente um JSON com a seguinte estrutura exata:
                     {{
                       "direcao": "COMPRA ou VENDA",
                       "confianca": "Ex: 95%",
+                      "confluencia": "Ex: 8.5 / 10",
                       "tempo_grafico": "Ex: 5M",
                       "analise": "Explicação técnica detalhada baseada no que você vê na imagem."
                     }}
@@ -169,13 +170,19 @@ if arquivo_print is not None:
                 except Exception as e:
                     st.error(f"Erro na análise: {e}")
 
-# Exibição do Resultado com Horário Exato Destacado
+# Exibição do Resultado com Cores Corrigidas e Métricas Completas
 if 'resultado_visao' in st.session_state:
     res = st.session_state.resultado_visao
-    direcao = res.get("direcao", "NEUTRO")
+    direcao = res.get("direcao", "NEUTRO").upper()
     
-    st.markdown(f"### 🎯 Recomendação: `{direcao}` ({res.get('confianca')})")
-    st.error(f"🕒 **HORÁRIO EXATO DE ENTRADA:** `{res.get('hora_exata')}` (Timeframe: {res.get('tempo_grafico')})")
+    # Cores corretas: Verde para COMPRA, Vermelho para VENDA
+    if "COMPRA" in direcao:
+        st.success(f"🎯 RECOMENDAÇÃO: **{direcao}**")
+    else:
+        st.error(f"🎯 RECOMENDAÇÃO: **{direcao}**")
+        
+    st.write(f"🕒 **Horário Exato de Entrada:** `{res.get('hora_exata')}` ({res.get('tempo_grafico')})")
+    st.write(f"⭐ **Confluência:** {res.get('confluencia', 'N/D')}  |  🔒 **Confiança:** {res.get('confianca', 'N/D')}")
     st.info(f"💡 **Parecer Técnico:** {res.get('analise')}")
 
 st.divider()
