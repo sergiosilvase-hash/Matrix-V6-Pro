@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from openai import OpenAI
 
-st.set_page_config(page_title="Matrix V6 - Multi-Agentes", page_icon="🤖", layout="centered")
+st.set_page_config(page_title="Matrix V6 - Cripto Pro", page_icon="🤖", layout="centered")
 
 st.markdown("""
     <style>
@@ -16,7 +16,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🤖 MATRIX V6 • MULTI-AGENTES")
+st.title("🤖 MATRIX V6 • CRIPTO PRO (HEZILEX)")
 
 # --- LEITURA DA CHAVE ---
 if "OPENAI_API_KEY" in st.secrets:
@@ -73,7 +73,7 @@ def salvar_memoria_historico(resultado, feedback):
         except Exception:
             historico = []
     historico.append(novo_registro)
-    with open(ARQUING := ARQUIVO_MEMORIA) if False else open(ARQUIVO_MEMORIA, "w", encoding="utf-8") as f:
+    with open(ARQUIVO_MEMORIA, "w", encoding="utf-8") as f:
         json.dump(historico, f, indent=4, ensure_ascii=False)
 
 def calcular_proxima_vela(agora, timeframe_str):
@@ -103,101 +103,74 @@ c3.metric("Win Rate", f"{win_rate:.0f}%")
 
 st.divider()
 
-# --- INTERFACE DE ENTRADA ---
-st.subheader("🤖 Mesa de Operações (Multi-Agentes)")
+# --- VARREDURA DE CRIPTOATIVOS ---
+st.subheader("🔍 Varredura Top 5 Cripto (Hezilex / Binance)")
 agora_sp = datetime.now(ZoneInfo("America/Sao_Paulo"))
 st.caption(f"🕒 Relógio SP: **{agora_sp.strftime('%H:%M:%S')}**")
 
-ativo_escolhido = st.selectbox("Selecione o Ativo na Hezilex:", ["EUR/USD", "GBP/USD", "AUD/USD", "EUR/JPY", "USD/JPY", "CARDANO"])
-arquivo_print = st.file_uploader("Envie o Print do Gráfico da Hezilex", type=["jpg", "jpeg", "png"])
-
-if arquivo_print is not None:
-    st.image(arquivo_print, caption=f"Gráfico de {ativo_escolhido} carregado", use_container_width=True)
-    
-    if st.button("🚀 ACIONAR COMITÊ DE AGENTES"):
-        if not api_key_input:
-            st.error("⚠️ Insira a Chave OpenAI.")
-        else:
-            with st.spinner("🔄 Agente 1 coletando cenário (Investing/Forex) -> Agentes Especialistas analisando Price Action -> Coordenador definindo ordem..."):
-                try:
-                    import base64
-                    image_bytes = arquivo_print.getvalue()
-                    base64_image = base64.b64encode(image_bytes).decode('utf-8')
-                    
-                    client = OpenAI(api_key=api_key_input)
-                    historico_recente = carregar_historico_15_dias()
-
-                    prompt_sistema = f"""
-                    Você é o sistema Coordenador Geral da matriz multi-agentes Matrix V6.
-                    Ativo selecionado: {ativo_escolhido}
-                    Horário atual em São Paulo: {agora_sp.strftime('%H:%M:%S')}.
-                    Histórico de Loss Loop (erros recentes para calibração): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
-                    
-                    A matriz opera com agentes em cadeia:
-                    - AGENTE 1 (Scraper/Contexto): Mapeia o cenário macroeconômico atual para o ativo {ativo_escolhido}.
-                    - AGENTES ESPECIALISTAS (Price Action e Indicadores): Analisam detalhadamente o print enviado (velas, tendência, suportes e resistências).
-                    - COORDENADOR: Sintetiza os pareceres, calcula confluência e nível de confiança.
-                    
-                    REGRA ABSOLUTA: Você DEVE escolher obrigatoriamente uma única direção clara: estritamente "COMPRA" ou estritamente "VENDA". Nunca responda em cima do muro.
-                    
-                    Retorne estritamente um objeto JSON com esta estrutura exata:
-                    {{
-                      "parecer_agente1": "Resumo do cenário macroeconômico e fluxo do ativo.",
-                      "parecer_especialistas": "Análise técnica detalhada das velas e tendência no print.",
-                      "direcao": "COMPRA ou VENDA",
-                      "confluencia": "Ex: 8.5 / 10",
-                      "confianca": "Ex: 92%",
-                      "tempo_grafico": "5M",
-                      "analise_final": "Conclusão definitiva do Coordenador para a operação."
-                    }}
-                    """
-                    
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "text", "text": prompt_sistema},
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": f"data:image/jpeg;base64,{base64_image}"
-                                        }
-                                    }
-                                ]
-                            }
-                        ],
-                        response_format={"type": "json_object"}
-                    )
-                    
-                    dados_ia = json.loads(response.choices[0].message.content)
-                    tf = dados_ia.get("tempo_grafico", "5M")
-                    dados_ia["hora_exata"] = calcular_proxima_vela(agora_sp, tf)
-                    
-                    st.session_state.resultado_comite = dados_ia
-                except Exception as e:
-                    st.error(f"Erro na execução dos agentes: {e}")
-
-# Exibição estruturada do Comitê de Agentes
-if 'resultado_comite' in st.session_state:
-    res = st.session_state.resultado_comite
-    direcao = res.get("direcao", "NEUTRO").upper()
-    
-    st.divider()
-    if "COMPRA" in direcao:
-        st.success(f"🎯 DECISÃO DO COMITÊ: **{direcao}**")
+if st.button("🚀 EXECUTAR VARREDURA DOS TOP 5 CRIPTO"):
+    if not api_key_input:
+        st.error("⚠️ Insira a Chave OpenAI.")
     else:
-        st.error(f"🎯 DECISÃO DO COMITÊ: **{direcao}**")
-        
-    st.write(f"🕒 **Horário Exato de Entrada:** `{res.get('hora_exata')}` ({res.get('tempo_grafico')})")
-    st.write(f"⭐ **Confluência:** {res.get('confluencia')}  |  🔒 **Confiança:** {res.get('confianca')}")
+        with st.spinner("🤖 Analisando o fluxo de criptoativos e cruzando com o histórico..."):
+            try:
+                client = OpenAI(api_key=api_key_input)
+                historico_recente = carregar_historico_15_dias()
+
+                prompt_sistema = f"""
+                Você é o Coordenador Geral do sistema Matrix V6 especializado em Opções Binárias de Criptomoedas.
+                O horário atual em São Paulo é {agora_sp.strftime('%H:%M:%S')}.
+                Histórico de Loss Loop (calibração): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
+                
+                Faça uma varredura considerando os principais criptoativos operados na Hezilex (como Bitcoin, Litecoin, Cardano, BNB, XRP, Ethereum, Solana, AVAX, DOGE, SUI, LINK).
+                Selecione os **Top 5 ativos** que apresentam as melhores margens e tendências neste momento.
+                
+                Para cada ativo, defina obrigatoriamente:
+                1. "paridade": Nome do ativo (Ex: "Bitcoin", "Cardano", "Solana", etc.)
+                2. "tempo_grafico": "1M", "5M" ou "15M"
+                3. "direcao": Estritamente "COMPRA" ou "VENDA" (proibido termos ambíguos)
+                4. "confluencia": Ex: "8.5 / 10"
+                5. "confianca": Ex: "92%"
+                6. "motivo": Justificativa técnica baseada na volatilidade e momento do criptoativo.
+                
+                Retorne estritamente um objeto JSON com uma lista chamada "ativos_recomendados".
+                """
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": prompt_sistema},
+                        {"role": "user", "content": "Gere os Top 5 criptoativos com melhor margem agora."}
+                    ],
+                    response_format={"type": "json_object"}
+                )
+                
+                dados_ia = json.loads(response.choices[0].message.content)
+                for ativo in dados_ia.get("ativos_recomendados", []):
+                    tf = ativo.get("tempo_grafico", "5M")
+                    ativo["hora_exata"] = calcular_proxima_vela(agora_sp, tf)
+                
+                st.session_state.resultado_varredura_cripto = dados_ia
+            except Exception as e:
+                st.error(f"Erro na varredura: {e}")
+
+# Exibição dos Ativos Varridos
+if 'resultado_varredura_cripto' in st.session_state:
+    res = st.session_state.resultado_varredura_cripto
+    lista_ativos = res.get("ativos_recomendados", [])
     
-    with st.expander("🕵️ Ver Relatórios Individuais dos Agentes"):
-        st.markdown(f"🌐 **Agente 1 (Cenário / Investing):**\n{res.get('parecer_agente1')}")
-        st.markdown(f"📈 **Agentes Especialistas (Price Action):**\n{res.get('parecer_especialistas')}")
-    
-    st.info(f"💡 **Parecer Final do Coordenador:** {res.get('analise_final')}")
+    if not lista_ativos:
+        st.warning("Nenhum ativo ideal no momento.")
+    else:
+        st.success(f"🎯 Varredura concluída! {len(lista_ativos)} criptoativos mapeados:")
+        for idx, ativo in enumerate(lista_ativos, 1):
+            direcao = ativo.get('direcao', 'NEUTRO').upper()
+            cor_emoji = "🟢" if "COMPRA" in direcao else "🔴"
+            
+            with st.expander(f"#{idx} - {ativo.get('paridade')} | ⏱️ {ativo.get('tempo_grafico')} | {cor_emoji} {direcao} ({ativo.get('confianca')})"):
+                st.markdown(f"🕒 **Horário Exato de Entrada:** `{ativo.get('hora_exata')}`")
+                st.markdown(f"⭐ **Confluência:** {ativo.get('confluencia')}  |  🔒 **Confiança:** {ativo.get('confianca')}")
+                st.markdown(f"💡 **Análise dos Agentes:** {ativo.get('motivo')}")
 
 st.divider()
 
@@ -210,14 +183,14 @@ if col_win.button("✅ REGISTRAR WIN"):
     st.session_state.banca_atual += lucro
     st.session_state.lucro_liquido += lucro
     st.session_state.wins += 1
-    salvar_memoria_historico("WIN", "Vitória validada pelo comitê.")
+    salvar_memoria_historico("WIN", "Vitória validada.")
     st.rerun()
 
 if col_loss.button("❌ REGISTRAR LOSS"):
     st.session_state.banca_atual -= stake
     st.session_state.lucro_liquido -= stake
     st.session_state.losses += 1
-    salvar_memoria_historico("LOSS", "Loss registrado. Calibração aplicada ao Loss Loop.")
+    salvar_memoria_historico("LOSS", "Loss registrado. Calibrando agentes.")
     st.rerun()
 
 if st.session_state.lucro_liquido >= meta_lucro:
