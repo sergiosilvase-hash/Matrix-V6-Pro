@@ -5,28 +5,26 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from openai import OpenAI
 
-st.set_page_config(page_title="Matrix V6 - Mobile Pro", page_icon="🤖", layout="centered")
+st.set_page_config(page_title="Matrix V6 - Vision Pro", page_icon="🤖", layout="centered")
 
-# --- CSS CUSTOMIZADO PARA REDUZIR O TAMANHO E OTIMIZAR O MOBILE ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: #ffffff; }
     .stButton>button { width: 100%; font-weight: bold; background-color: #007acc; color: white; border-radius: 4px; padding: 0.4rem; font-size: 14px; }
-    h1 { font-size: 1.5rem !important; text-align: center; margin-bottom: 0px; }
-    p { font-size: 0.9rem; }
+    h1 { font-size: 1.4rem !important; text-align: center; margin-bottom: 0px; }
     .block-container { padding-top: 1rem; padding-bottom: 1rem; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🤖 MATRIX V6 • MOBILE")
+st.title("🤖 MATRIX V6 • VISION PRO")
 
-# --- LEITURA AUTOMÁTICA DA CHAVE ---
+# --- LEITURA DA CHAVE ---
 if "OPENAI_API_KEY" in st.secrets:
     api_key_input = st.secrets["OPENAI_API_KEY"]
 else:
     api_key_input = st.sidebar.text_input("Chave OpenAI (API Key)", type="password")
 
-# --- CONFIGURAÇÕES NA BARRA LATERAL ---
+# --- CONFIGURAÇÕES DE RISCO ---
 st.sidebar.header("⚙️ Configurações & Risco")
 banca_inicial = st.sidebar.number_input("Banca Inicial (R$)", value=500.0, step=10.0)
 stake = st.sidebar.number_input("Valor da Entrada (R$)", value=5.0, step=1.0)
@@ -78,7 +76,7 @@ def salvar_memoria_historico(resultado, feedback):
     with open(ARQUIVO_MEMORIA, "w", encoding="utf-8") as f:
         json.dump(historico, f, indent=4, ensure_ascii=False)
 
-# --- PAINEL COMPACTO DE GESTÃO (METRICAS EM LINHA ÚNICA) ---
+# --- PAINEL COMPACTO ---
 c1, c2, c3 = st.columns(3)
 c1.metric("Banca", f"R${st.session_state.banca_atual:.1f}")
 c2.metric("Lucro", f"R${st.session_state.lucro_liquido:+.1f}")
@@ -87,104 +85,100 @@ c3.metric("Win Rate", f"{win_rate:.0f}%")
 
 st.divider()
 
-# --- FUNÇÃO PARA CALCULAR A PRÓXIMA VELA REDONDA ---
-def calcular_proxima_vela(agora, timeframe_str):
-    minutos_tf = 5
-    if "1M" in timeframe_str.upper():
-        minutos_tf = 1
-    elif "5M" in timeframe_str.upper():
-        minutos_tf = 5
-    elif "15M" in timeframe_str.upper():
-        minutos_tf = 15
-    
-    minuto_atual = agora.minute
-    resto = minuto_atual % minutos_tf
-    minutos_faltantes = minutos_tf - resto
-    if minutos_faltantes == 0 and agora.second == 0:
-        minutos_faltantes = minutos_tf
-        
-    proxima = agora + timedelta(minutes=minutos_faltantes)
-    return proxima.replace(second=0, microsecond=0).strftime("%H:%M:00")
+# --- UPLOAD DE PRINT (ANÁLISE REAL DO GRÁFICO DA HEZILEX) ---
+st.subheader("📸 Envie o Print do Gráfico")
+st.caption("Tire o print na Hezilex e envie aqui. O GPT-4o Vision analisará a tendência real (Price Action).")
 
-# --- VARREDURA OTIMIZADA PARA HEZILEX ---
+arquivo_print = st.file_uploader("Escolha a imagem do gráfico", type=["jpg", "jpeg", "png"])
+
 agora_sp = datetime.now(ZoneInfo("America/Sao_Paulo"))
-st.caption(f"🕒 Horário SP: **{agora_sp.strftime('%H:%M:%S')}**")
 
-if st.button("🚀 EXECUTAR VARREDURA (HEZILEX)"):
-    if not api_key_input:
-        st.error("⚠️ Insira a Chave OpenAI.")
-    else:
-        with st.spinner("Analisando pares da Hezilex..."):
-            try:
-                client = OpenAI(api_key=api_key_input)
-                historico_recente = carregar_historico_15_dias()
-
-                prompt_sistema = f"""
-                Você é o Coordenador Geral do sistema Matrix V6. O horário atual em São Paulo é {agora_sp.strftime('%H:%M:%S')}.
-                Histórico recente: {json.dumps(historico_recente[-10:], ensure_ascii=False)}
-                
-                Faça uma varredura estritamente focada nos ativos clássicos de Opções Binárias operados na corretora Hezilex (EUR/USD, GBP/USD, AUD/USD, EUR/JPY, USD/JPY).
-                Retorne um JSON contendo uma lista "ativos_recomendados" com até 5 ativos contendo:
-                1. "paridade": Ex: "EUR/USD"
-                2. "tempo_grafico": "1M", "5M" ou "15M"
-                3. "direcao": "COMPRA" ou "VENDA"
-                4. "confianca": Ex: "92%"
-                5. "motivo": Breve justificativa técnica.
-                """
-                
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": prompt_sistema},
-                        {"role": "user", "content": "Gere os sinais compatíveis com a Hezilex."}
-                    ],
-                    response_format={"type": "json_object"}
-                )
-                
-                dados_ia = json.loads(response.choices[0].message.content)
-                for ativo in dados_ia.get("ativos_recomendados", []):
-                    tf = ativo.get("tempo_grafico", "5M")
-                    ativo["hora_exata"] = calcular_proxima_vela(agora_sp, tf)
-                
-                st.session_state.resultado_varredura = dados_ia
-            except Exception as e:
-                st.error(f"Erro: {e}")
-
-# Exibição Compacta dos Ativos
-if 'resultado_varredura' in st.session_state:
-    res = st.session_state.resultado_varredura
-    lista_ativos = res.get("ativos_recomendados", [])
+if arquivo_print is not None:
+    st.image(arquivo_print, caption="Gráfico enviado para análise", use_container_width=True)
     
-    if not lista_ativos:
-        st.warning("Nenhum ativo ideal no momento.")
-    else:
-        for idx, ativo in enumerate(lista_ativos, 1):
-            with st.expander(f"#{idx} | {ativo.get('paridade')} ({ativo.get('tempo_grafico')}) - {ativo.get('direcao')} [{ativo.get('confianca')}]"):
-                st.markdown(f"🕒 **Entrada:** `{ativo.get('hora_exata')}` | ⏱️ **TF:** `{ativo.get('tempo_grafico')}`")
-                st.markdown(f"💡 **Análise:** {ativo.get('motivo')}")
+    if st.button("🔍 ANALISAR PRINT COM OS AGENTES"):
+        if not api_key_input:
+            st.error("⚠️ Insira a Chave OpenAI.")
+        else:
+            with st.spinner("Os agentes estão lendo a Price Action e o Loss Loop..."):
+                try:
+                    import base64
+                    image_bytes = arquivo_print.getvalue()
+                    base64_image = base64.b64encode(image_bytes).decode('utf-8')
+                    
+                    client = OpenAI(api_key=api_key_input)
+                    historico_recente = carregar_historico_15_dias()
+
+                    prompt_sistema = f"""
+                    Você é o Coordenador Geral do sistema Matrix V6 de Opções Binárias.
+                    O horário atual em São Paulo é {agora_sp.strftime('%H:%M:%S')}.
+                    Histórico de erros recentes (Loss Loop para calibragem e correção): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
+                    
+                    Analise rigorosamente a imagem do gráfico da Hezilex enviada pelo usuário. Identifique a tendência atual (baixa, alta ou consolidação), suporte/resistência e velas recentes.
+                    Retorne estritamente um JSON com a seguinte estrutura:
+                    {{
+                      "direcao": "COMPRA ou VENDA",
+                      "confianca": "Ex: 95%",
+                      "tempo_grafico": "Ex: 5M",
+                      "analise": "Explicação técnica detalhada baseada no que você vê na imagem (ex: forte tendência de baixa com rejeição em resistência)."
+                    }}
+                    """
+                    
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt_sistema},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{base64_image}"
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        response_format={"type": "json_object"}
+                    )
+                    
+                    st.session_state.resultado_visao = json.loads(response.choices[0].message.content)
+                except Exception as e:
+                    st.error(f"Erro na análise de visão: {e}")
+
+# Exibição do Resultado da Análise Visual
+if 'resultado_visao' in st.session_state:
+    res = st.session_state.resultado_visao
+    direcao = res.get("direcao", "NEUTRO")
+    cor_box = "green" if direcao == "COMPRA" else "red"
+    
+    st.markdown(f"### 🎯 Recomendação: `{direcao}` ({res.get('confianca')})")
+    st.info(f"⏱️ **Timeframe sugerido:** {res.get('tempo_grafico')}")
+    st.warning(f"💡 **Parecer Técnico dos Agentes:** {res.get('analise')}")
 
 st.divider()
 
-# --- PLACAR E BOTÕES REDUZIDOS ---
+# --- PLACAR E BOTÕES ---
 st.caption(f"Placar: 🟢 {st.session_state.wins} X 🔴 {st.session_state.losses}")
 col_win, col_loss = st.columns(2)
 
-if col_win.button("✅ WIN"):
+if col_win.button("✅ REGISTRAR WIN"):
     lucro = stake * (payout / 100.0)
     st.session_state.banca_atual += lucro
     st.session_state.lucro_liquido += lucro
     st.session_state.wins += 1
-    salvar_memoria_historico("WIN", "Vitória validada.")
+    salvar_memoria_historico("WIN", "Vitória validada com sucesso.")
     st.rerun()
 
-if col_loss.button("❌ LOSS"):
+if col_loss.button("❌ REGISTRAR LOSS"):
     st.session_state.banca_atual -= stake
     st.session_state.lucro_liquido -= stake
     st.session_state.losses += 1
-    salvar_memoria_historico("LOSS", "Loss mapeado.")
+    salvar_memoria_historico("LOSS", "Loss registrado. Matriz ajustada para evitar repetição.")
     st.rerun()
 
 if st.session_state.lucro_liquido >= meta_lucro:
-    st.success("🎯 Meta Atingida!")
+    st.success("🎯 Meta de Lucro Atingida!")
 elif st.session_state.lucro_liquido <= -stop_loss:
     st.error("🛑 Stop Loss Atingido!")
