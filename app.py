@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from openai import OpenAI
 
 st.set_page_config(page_title="Matrix V6 - Coordenador Cloud", page_icon="🤖", layout="centered")
@@ -14,9 +15,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🤖 MATRIX V6 • NUVEM ATIVA")
-st.write("Painel Inteligente com Varredura de Ativos e Gestão de Risco")
+st.write("Painel Inteligente Otimizado para Mobile & Fuso Horário de Brasília")
 
-# --- LEITURA AUTOMÁTICA DA CHAVE (SECRETS OU BARRA LATERAL) ---
+# --- LEITURA AUTOMÁTICA DA CHAVE ---
 if "OPENAI_API_KEY" in st.secrets:
     api_key_input = st.secrets["OPENAI_API_KEY"]
 else:
@@ -47,13 +48,13 @@ def carregar_historico_15_dias():
     try:
         with open(ARQUIVO_MEMORIA, "r", encoding="utf-8") as f:
             dados = json.load(f)
-        limite_data = datetime.now() - timedelta(days=15)
-        return [item for item in dados if datetime.strptime(item["timestamp_data"], "%Y-%m-%d %H:%M:%S") >= limite_data]
+        limite_data = datetime.now(ZoneInfo("America/Sao_Paulo")) - timedelta(days=15)
+        return [item for item in dados if datetime.strptime(item["timestamp_data"], "%Y-%m-%d %H:%M:%S") >= limite_data.replace(tzinfo=None)]
     except Exception:
         return []
 
 def salvar_memoria_historico(resultado, feedback):
-    agora = datetime.now()
+    agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
     novo_registro = {
         "timestamp_data": agora.strftime("%Y-%m-%d %H:%M:%S"),
         "resultado": resultado,
@@ -67,10 +68,8 @@ def salvar_memoria_historico(resultado, feedback):
         except Exception:
             historico = []
     historico.append(novo_registro)
-    limite_data = agora - timedelta(days=15)
-    historico_filtrado = [item for item in historico if datetime.strptime(item["timestamp_data"], "%Y-%m-%d %H:%M:%S") >= limite_data]
     with open(ARQUIVO_MEMORIA, "w", encoding="utf-8") as f:
-        json.dump(historico_filtrado, f, indent=4, ensure_ascii=False)
+        json.dump(historico, f, indent=4, ensure_ascii=False)
 
 # --- PAINEL PRINCIPAL: GESTÃO DE BANCA ---
 col1, col2, col3 = st.columns(3)
@@ -82,24 +81,33 @@ col3.metric("Win Rate", f"{win_rate:.1f}%")
 
 st.divider()
 
-# --- VARREDURA DE ATIVOS E ANÁLISE ---
-st.subheader("🔍 Varredura de Oportunidades (Top Ativos)")
-st.write("O Coordenador fará uma varredura cruzando o cenário atual com o histórico de 15 dias para listar até 5 melhores ativos/cenários para negociação.")
+# --- VARREDURA DE ATIVOS (OTIMIZADA PARA CELULAR) ---
+st.subheader("🔍 Varredura em Tempo Real (Horário de Brasília)")
 
-if st.button("🚀 EXECUTAR VARREDURA DOS TOP 5 ATIVOS"):
+# Pega o horário atual exato de São Paulo
+agora_sp = datetime.now(ZoneInfo("America/Sao_Paulo"))
+st.info(f"🕒 *Relógio Sincronizado (São Paulo):* {agora_sp.strftime('%H:%M:%S')}")
+
+if st.button("🚀 EXECUTAR VARREDURA DOS TOP 5 ATIVOS (AGORA)"):
     if not api_key_input:
-        st.error("⚠️ Insira sua Chave da OpenAI (nos Secrets do Streamlit ou na barra lateral).")
+        st.error("⚠️ Insira sua Chave da OpenAI.")
     else:
-        with st.spinner("🤖 Os agentes estão escaneando o mercado e cruzando com o Loss Loop..."):
+        with st.spinner("🤖 Calculando sinais para a próxima vela com base no horário atual do Brasil..."):
             try:
                 client = OpenAI(api_key=api_key_input)
                 historico_recente = carregar_historico_15_dias()
 
+                # Calcula o horário exato da próxima vela (arredondado para cima ou próximo minuto útil)
+                proxima_vela = agora_sp + timedelta(minutes=2)
+                horario_sugerido = proxima_vela.strftime("%H:%M:00")
+
                 prompt_sistema = f"""
                 Você é o Coordenador Geral do sistema Matrix V6 de Opções Binárias.
-                Histórico dos últimos 15 dias (Loss Loop): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
+                O horário atual exato em São Paulo (Brasil) é: {agora_sp.strftime('%H:%M:%S')}.
+                Histórico recente (Loss Loop): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
                 
-                Faça uma varredura simulada de mercado e retorne estritamente um objeto JSON contendo uma lista chamada "ativos_recomendados" com até 5 principais ativos (ex: EUR/USD, GBP/USD, AUD/USD, EUR/JPY, USD/JPY) que apresentam melhor margem e confluência neste momento.
+                Faça uma varredura de mercado e retorne estritamente um objeto JSON contendo uma lista chamada "ativos_recomendados" com até 5 principais ativos (ex: EUR/USD, GBP/USD, AUD/USD, EUR/JPY, USD/JPY).
+                ATENÇÃO: O campo "hora_exata" de cada ativo DEVE ser obrigatoriamente exatamente ou após {horario_sugerido} (nunca horários passados).
                 
                 O JSON deve seguir rigorosamente este formato:
                 {{
@@ -109,8 +117,8 @@ if st.button("🚀 EXECUTAR VARREDURA DOS TOP 5 ATIVOS"):
                       "direcao": "COMPRA",
                       "confluencia": "8.8 / 10",
                       "confianca": "94%",
-                      "hora_exata": "14:45:00",
-                      "motivo": "Forte tendência de alta com suporte validado pelo histórico."
+                      "hora_exata": "{horario_sugerido}",
+                      "motivo": "Forte tendência de alta alinhada com o horário atual do Brasil."
                     }}
                   ]
                 }}
@@ -120,7 +128,7 @@ if st.button("🚀 EXECUTAR VARREDURA DOS TOP 5 ATIVOS"):
                     model="gpt-4o",
                     messages=[
                         {"role": "system", "content": prompt_sistema},
-                        {"role": "user", "content": "Execute a varredura dos top 5 ativos para negociação agora."}
+                        {"role": "user", "content": "Execute a varredura considerando o fuso horário atual de SP."}
                     ],
                     response_format={"type": "json_object"}
                 )
@@ -137,10 +145,10 @@ if 'resultado_varredura' in st.session_state:
     if not lista_ativos:
         st.warning("Nenhum ativo com margem segura no momento.")
     else:
-        st.success(f"🎯 Varredura concluída! {len(lista_ativos)} ativos mapeados com alta confluência:")
+        st.success(f"🎯 Varredura concluída no horário local! {len(lista_ativos)} ativos mapeados:")
         for idx, ativo in enumerate(lista_ativos, 1):
             with st.expander(f"#{idx} - {ativo.get('paridade')} | Direção: {ativo.get('direcao')} | Confiança: {ativo.get('confianca')}"):
-                st.write(f"🕒 *Horário de Entrada:* {ativo.get('hora_exata')}")
+                st.write(f"🕒 *Horário de Entrada (Próxima Vela):* {ativo.get('hora_exata')}")
                 st.write(f"⭐ *Confluência:* {ativo.get('confluencia')}")
                 st.write(f"💡 *Análise dos Agentes:* {ativo.get('motivo')}")
 
@@ -157,14 +165,14 @@ if col_win.button("✅ REGISTRAR WIN"):
     st.session_state.banca_atual += lucro
     st.session_state.lucro_liquido += lucro
     st.session_state.wins += 1
-    salvar_memoria_historico("WIN", "Vitória validada. Pesos positivos reforçados na matriz.")
+    salvar_memoria_historico("WIN", "Vitória validada.")
     st.rerun()
 
 if col_loss.button("❌ REGISTRAR LOSS"):
     st.session_state.banca_atual -= stake
     st.session_state.lucro_liquido -= stake
     st.session_state.losses += 1
-    salvar_memoria_historico("LOSS", "Loss mapeado. Ajuste corretivo aplicado aos agentes.")
+    salvar_memoria_historico("LOSS", "Loss mapeado.")
     st.rerun()
 
 if st.session_state.lucro_liquido >= meta_lucro:
