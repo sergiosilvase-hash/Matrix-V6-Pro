@@ -76,6 +76,25 @@ def salvar_memoria_historico(resultado, feedback):
     with open(ARQUIVO_MEMORIA, "w", encoding="utf-8") as f:
         json.dump(historico, f, indent=4, ensure_ascii=False)
 
+# --- FUNÇÃO PARA CALCULAR A PRÓXIMA VELA REDONDA ---
+def calcular_proxima_vela(agora, timeframe_str):
+    minutos_tf = 5
+    if "1M" in timeframe_str.upper():
+        minutos_tf = 1
+    elif "5M" in timeframe_str.upper():
+        minutos_tf = 5
+    elif "15M" in timeframe_str.upper():
+        minutos_tf = 15
+    
+    minuto_atual = agora.minute
+    resto = minuto_atual % minutos_tf
+    minutos_faltantes = minutos_tf - resto
+    if minutos_faltantes == 0 and agora.second == 0:
+        minutos_faltantes = minutos_tf
+        
+    proxima = agora + timedelta(minutes=minutos_faltantes)
+    return proxima.replace(second=0, microsecond=0).strftime("%H:%M:00")
+
 # --- PAINEL COMPACTO ---
 c1, c2, c3 = st.columns(3)
 c1.metric("Banca", f"R${st.session_state.banca_atual:.1f}")
@@ -85,22 +104,21 @@ c3.metric("Win Rate", f"{win_rate:.0f}%")
 
 st.divider()
 
-# --- UPLOAD DE PRINT (ANÁLISE REAL DO GRÁFICO DA HEZILEX) ---
+# --- UPLOAD DE PRINT ---
 st.subheader("📸 Envie o Print do Gráfico")
-st.caption("Tire o print na Hezilex e envie aqui. O GPT-4o Vision analisará a tendência real (Price Action).")
+agora_sp = datetime.now(ZoneInfo("America/Sao_Paulo"))
+st.caption(f"🕒 Relógio SP: **{agora_sp.strftime('%H:%M:%S')}**")
 
 arquivo_print = st.file_uploader("Escolha a imagem do gráfico", type=["jpg", "jpeg", "png"])
 
-agora_sp = datetime.now(ZoneInfo("America/Sao_Paulo"))
-
 if arquivo_print is not None:
-    st.image(arquivo_print, caption="Gráfico enviado para análise", use_container_width=True)
+    st.image(arquivo_print, caption="Gráfico enviado", use_container_width=True)
     
     if st.button("🔍 ANALISAR PRINT COM OS AGENTES"):
         if not api_key_input:
             st.error("⚠️ Insira a Chave OpenAI.")
         else:
-            with st.spinner("Os agentes estão lendo a Price Action e o Loss Loop..."):
+            with st.spinner("Analisando Price Action e calculando horário da vela..."):
                 try:
                     import base64
                     image_bytes = arquivo_print.getvalue()
@@ -112,15 +130,15 @@ if arquivo_print is not None:
                     prompt_sistema = f"""
                     Você é o Coordenador Geral do sistema Matrix V6 de Opções Binárias.
                     O horário atual em São Paulo é {agora_sp.strftime('%H:%M:%S')}.
-                    Histórico de erros recentes (Loss Loop para calibragem e correção): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
+                    Histórico de erros recentes (Loss Loop para calibragem): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
                     
-                    Analise rigorosamente a imagem do gráfico da Hezilex enviada pelo usuário. Identifique a tendência atual (baixa, alta ou consolidação), suporte/resistência e velas recentes.
+                    Analise rigorosamente a imagem do gráfico enviada. Identifique a tendência atual, suporte/resistência e velas recentes.
                     Retorne estritamente um JSON com a seguinte estrutura:
                     {{
                       "direcao": "COMPRA ou VENDA",
                       "confianca": "Ex: 95%",
                       "tempo_grafico": "Ex: 5M",
-                      "analise": "Explicação técnica detalhada baseada no que você vê na imagem (ex: forte tendência de baixa com rejeição em resistência)."
+                      "analise": "Explicação técnica detalhada baseada no que você vê na imagem."
                     }}
                     """
                     
@@ -143,19 +161,22 @@ if arquivo_print is not None:
                         response_format={"type": "json_object"}
                     )
                     
-                    st.session_state.resultado_visao = json.loads(response.choices[0].message.content)
+                    dados_ia = json.loads(response.choices[0].message.content)
+                    tf = dados_ia.get("tempo_grafico", "5M")
+                    dados_ia["hora_exata"] = calcular_proxima_vela(agora_sp, tf)
+                    
+                    st.session_state.resultado_visao = dados_ia
                 except Exception as e:
-                    st.error(f"Erro na análise de visão: {e}")
+                    st.error(f"Erro na análise: {e}")
 
-# Exibição do Resultado da Análise Visual
+# Exibição do Resultado com Horário Exato Destacado
 if 'resultado_visao' in st.session_state:
     res = st.session_state.resultado_visao
     direcao = res.get("direcao", "NEUTRO")
-    cor_box = "green" if direcao == "COMPRA" else "red"
     
     st.markdown(f"### 🎯 Recomendação: `{direcao}` ({res.get('confianca')})")
-    st.info(f"⏱️ **Timeframe sugerido:** {res.get('tempo_grafico')}")
-    st.warning(f"💡 **Parecer Técnico dos Agentes:** {res.get('analise')}")
+    st.error(f"🕒 **HORÁRIO EXATO DE ENTRADA:** `{res.get('hora_exata')}` (Timeframe: {res.get('tempo_grafico')})")
+    st.info(f"💡 **Parecer Técnico:** {res.get('analise')}")
 
 st.divider()
 
@@ -168,14 +189,14 @@ if col_win.button("✅ REGISTRAR WIN"):
     st.session_state.banca_atual += lucro
     st.session_state.lucro_liquido += lucro
     st.session_state.wins += 1
-    salvar_memoria_historico("WIN", "Vitória validada com sucesso.")
+    salvar_memoria_historico("WIN", "Vitória validada.")
     st.rerun()
 
 if col_loss.button("❌ REGISTRAR LOSS"):
     st.session_state.banca_atual -= stake
     st.session_state.lucro_liquido -= stake
     st.session_state.losses += 1
-    salvar_memoria_historico("LOSS", "Loss registrado. Matriz ajustada para evitar repetição.")
+    salvar_memoria_historico("LOSS", "Loss registrado. Calibrando agentes.")
     st.rerun()
 
 if st.session_state.lucro_liquido >= meta_lucro:
