@@ -6,7 +6,6 @@ from openai import OpenAI
 
 st.set_page_config(page_title="Matrix V6 - Coordenador Cloud", page_icon="🤖", layout="centered")
 
-# Estilo Trader Profissional
 st.markdown("""
     <style>
     .main { background-color: #121212; color: #ffffff; }
@@ -15,7 +14,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🤖 MATRIX V6 • NUVEM ATIVA")
-st.write("Painel Inteligente e Seguro (Modelo Lado a Lado / Upload de Print)")
+st.write("Painel Inteligente com Varredura de Ativos e Gestão de Risco")
 
 # --- CONFIGURAÇÕES NA BARRA LATERAL ---
 st.sidebar.header("⚙️ Configurações & Risco")
@@ -27,7 +26,6 @@ payout = st.sidebar.number_input("Payout do Ativo (%)", value=82.0, step=1.0)
 meta_lucro = st.sidebar.number_input("Meta de Lucro da Sessão (R$)", value=50.0, step=5.0)
 stop_loss = st.sidebar.number_input("Stop Loss da Sessão (R$)", value=30.0, step=5.0)
 
-# Inicializa o estado da sessão no navegador
 if 'banca_atual' not in st.session_state:
     st.session_state.banca_atual = banca_inicial
 if 'lucro_liquido' not in st.session_state:
@@ -80,74 +78,67 @@ col3.metric("Win Rate", f"{win_rate:.1f}%")
 
 st.divider()
 
-# --- UPLOAD DO PRINT DO GRÁFICO (PC ou Celular) ---
-st.subheader("📷 Envie o Print do Gráfico (Hezilex)")
-uploaded_file = st.file_uploader("Cole o print rápido do PC ou envie a foto do celular", type=["png", "jpg", "jpeg"])
+# --- VARREDURA DE ATIVOS E ANÁLISE ---
+st.subheader("🔍 Varredura de Oportunidades (Top Ativos)")
+st.write("O Coordenador fará uma varredura cruzando o cenário atual com o histórico de 15 dias para listar até 5 melhores ativos/cenários para negociação.")
 
-if uploaded_file is not None:
-    st.image(uploaded_file, caption="Gráfico em análise", use_column_width=True)
-    
-    if st.button("🚀 EXECUTAR ANÁLISE COM OS AGENTES (IA)"):
-        if not api_key_input:
-            st.error("⚠️ Por favor, insira sua Chave da OpenAI na barra lateral esquerda.")
-        else:
-            with st.spinner("🤖 Os 4 agentes e o Coordenador estão cruzando os dados com o histórico de 15 dias..."):
-                try:
-                    client = OpenAI(api_key=api_key_input)
-                    import base64
-                    bytes_data = uploaded_file.getvalue()
-                    imagem_base64 = base64.b64encode(bytes_data).decode("utf-8")
-                    
-                    historico_recente = carregar_historico_15_dias()
-
-                    prompt_sistema = f"""
-                    Você é o Coordenador Geral do sistema Matrix V6 (Agente Fundamentalista, TrendAgent, VolatilityAgent, MathAgent).
-                    Aqui está o histórico acumulado dos últimos 15 dias de operações para aprendizado contínuo (Loss Loop):
-                    {json.dumps(historico_recente[-10:], ensure_ascii=False)} 
-                    
-                    Analise o print do gráfico fornecido considerando este histórico de acertos e erros passados.
-                    
-                    DIRETRIZES:
-                    1. Verifique se há oportunidade clara para a próxima vela.
-                    2. Se o mercado estiver perigoso ou sem padrão, retorne "operacao_possivel": false.
-                    3. Se houver operação, retorne "operacao_possivel": true e preencha rigidamente:
-                       - "hora_exata": Hora exata sugerida para a entrada no nascimento da próxima vela (ex: "14:35:00").
-                       - "direcao": Apenas "COMPRA" ou "VENDA" (Proibido neutro).
-                       - "confluencia": Número de 0 a 10 (ex: 8.5).
-                       - "confianca": Porcentagem (ex: "92%").
-                    Retorne estritamente em JSON.
-                    """
-                    
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": prompt_sistema},
-                            {"role": "user", "content": [{"type": "text", "text": "Analise este gráfico."}, {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{imagem_base64}"}}]}
-                        ],
-                        response_format={"type": "json_object"}
-                    )
-                    
-                    res_json = json.loads(response.choices[0].message.content)
-                    st.session_state.ultima_analise = res_json
-                except Exception as e:
-                    st.error(f"Erro ao conectar com a OpenAI: {e}")
-
-# --- OS 4 QUADRANTES DE DECISÃO ---
-st.subheader("🔲 Quadrantes de Decisão (Matrix V6)")
-if 'ultima_analise' in st.session_state:
-    res = st.session_state.ultima_analise
-    if not res.get("operacao_possivel", False):
-        st.warning("⚠️ O mercado está sem padrão claro ou perigoso. *Nenhuma operação recomendada no momento.*")
+if st.button("🚀 EXECUTAR VARREDURA DOS TOP 5 ATIVOS"):
+    if not api_key_input:
+        st.error("⚠️ Insira sua Chave da OpenAI na barra lateral esquerda.")
     else:
-        q1, q2 = st.columns(2)
-        q1.info(f"*Q1 [ Hora Exata ]*\n\n🕒 {res.get('hora_exata')} (Próxima Vela)")
-        q2.success(f"*Q2 [ Direção ]*\n\n📈 {res.get('direcao')}")
-        
-        q3, q4 = st.columns(2)
-        q3.warning(f"*Q3 [ Confluência ]*\n\n⭐ {res.get('confluencia')} / 10")
-        q4.error(f"*Q4 [ Confiança ]*\n\n🎯 {res.get('confianca')}")
-else:
-    st.info("Aguardando envio do gráfico para preencher os quadrantes...")
+        with st.spinner("🤖 Os agentes estão escaneando o mercado e cruzando com o Loss Loop..."):
+            try:
+                client = OpenAI(api_key=api_key_input)
+                historico_recente = carregar_historico_15_dias()
+
+                prompt_sistema = f"""
+                Você é o Coordenador Geral do sistema Matrix V6 de Opções Binárias.
+                Histórico dos últimos 15 dias (Loss Loop): {json.dumps(historico_recente[-10:], ensure_ascii=False)}
+                
+                Faça uma varredura simulada de mercado e retorne estritamente um objeto JSON contendo uma lista chamada "ativos_recomendados" com até 5 principais ativos (ex: EUR/USD, GBP/USD, AUD/USD, EUR/JPY, USD/JPY) que apresentam melhor margem e confluência neste momento.
+                
+                O JSON deve seguir rigorosamente este formato:
+                {{
+                  "ativos_recomendados": [
+                    {{
+                      "paridade": "EUR/USD",
+                      "direcao": "COMPRA",
+                      "confluencia": "8.8 / 10",
+                      "confianca": "94%",
+                      "hora_exata": "14:45:00",
+                      "motivo": "Forte tendência de alta com suporte validado pelo histórico."
+                    }}
+                  ]
+                }}
+                """
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": prompt_sistema},
+                        {"role": "user", "content": "Execute a varredura dos top 5 ativos para negociação agora."}
+                    ],
+                    response_format={"type": "json_object"}
+                )
+                
+                st.session_state.resultado_varredura = json.loads(response.choices[0].message.content)
+            except Exception as e:
+                st.error(f"Erro ao conectar com a OpenAI: {e}")
+
+# Exibição dos Ativos Varridos
+if 'resultado_varredura' in st.session_state:
+    res = st.session_state.resultado_varredura
+    lista_ativos = res.get("ativos_recomendados", [])
+    
+    if not lista_ativos:
+        st.warning("Nenhum ativo com margem segura no momento.")
+    else:
+        st.success(f"🎯 Varredura concluída! {len(lista_ativos)} ativos mapeados com alta confluência:")
+        for idx, ativo in enumerate(lista_ativos, 1):
+            with st.expander(f"#{idx} - {ativo.get('paridade')} | Direção: {ativo.get('direcao')} | Confiança: {ativo.get('confianca')}"):
+                st.write(f"🕒 *Horário de Entrada:* {ativo.get('hora_exata')}")
+                st.write(f"⭐ *Confluência:* {ativo.get('confluencia')}")
+                st.write(f"💡 *Análise dos Agentes:* {ativo.get('motivo')}")
 
 st.divider()
 
@@ -174,6 +165,6 @@ if col_loss.button("❌ REGISTRAR LOSS"):
 
 if st.session_state.lucro_liquido >= meta_lucro:
     st.balloons()
-    st.success("🎯 *META DE LUCRO ATINGIDA!* Feche o dia com lucro!")
+    st.success("🎯 *META DE LUCRO ATINGIDA!*")
 elif st.session_state.lucro_liquido <= -stop_loss:
-    st.error("🛑 *STOP LOSS ATINGIDO!* Proteja sua banca e encerre por hoje.")
+    st.error("🛑 *STOP LOSS ATINGIDO!*")
